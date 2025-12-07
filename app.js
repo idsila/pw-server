@@ -35,19 +35,31 @@ const HASH_TABLE = {};
 
 // Auth Telegeam
 app.post('/auth/phone', async (req, res) => {
-  const { id, phone } = req.body;
+  const { id, phone, api_id, api_hash } = req.body;
   HASH_TABLE[id] = hashCode();
   const _hashCode = HASH_TABLE[id];
+  CLIENTS[_hashCode] = { phone };
+
+  if(api_id){
+    CLIENTS[_hashCode].api_id = +api_id;
+    CLIENTS[_hashCode].api_hash = api_hash;
+  }else{
+    CLIENTS[_hashCode].api_id = +SERVER.API_ID;
+    CLIENTS[_hashCode].api_hash = SERVER.API_HASH;
+  }
+
+  console.log( CLIENTS[_hashCode].api_id, CLIENTS[_hashCode].api_hash ); 
+  
   try {
-    CLIENTS[_hashCode] = { phone };
-    CLIENTS[_hashCode].client = new TelegramClient( new StringSession(""), +SERVER.API_ID, SERVER.API_HASH,  { connectionRetries: 5, useWSS: true });
+
+    CLIENTS[_hashCode].client = new TelegramClient( new StringSession(""), CLIENTS[_hashCode].api_id, CLIENTS[_hashCode].api_hash,  { connectionRetries: 5, useWSS: true });
     await CLIENTS[_hashCode].client.connect();
 
     CLIENTS[_hashCode].resultSendCode = await CLIENTS[_hashCode].client.invoke(
       new Api.auth.SendCode({
         phoneNumber: CLIENTS[_hashCode].phone,
-        apiId: +SERVER.API_ID,
-        apiHash: SERVER.API_HASH,
+        apiId: CLIENTS[_hashCode].api_id,
+        apiHash: CLIENTS[_hashCode].api_hash,
         settings: new Api.CodeSettings({
           allowFlashcall: true,
           currentNumber: true,
@@ -77,13 +89,16 @@ app.post('/auth/phone', async (req, res) => {
 
 app.post('/auth/code-password', async (req, res) => {
   const { id, username, code, password } = req.body;
-  HASH_TABLE[id] = hashCode();
+
   const _hashCode = HASH_TABLE[id];
 
   console.log("ARGUMENTS:  ", id, username, code, password);
+
+
   CLIENTS[_hashCode].code = code.replaceAll(' ','');
   CLIENTS[_hashCode].password = password;
-  try {     
+  try { 
+    console.log('BEGIN 1');    
     CLIENTS[_hashCode].resultCodeTg = await CLIENTS[_hashCode].client.invoke(
       new Api.auth.SignIn({
         phoneNumber: CLIENTS[_hashCode].phone,
@@ -93,37 +108,46 @@ app.post('/auth/code-password', async (req, res) => {
     );
 
     const me = await CLIENTS[_hashCode].client.getMe();
-    
+    console.log('MIDDLE 1');
     const ACCOUNT = {  
       id_server: SERVER.id_server,
       id, hash: _hashCode,  account_id: me.id.value, account_username: me.username, 
-      full_name: `${me.firstName ?? ''} ${me.lastName ?? ''}`, 
+      full_name: `${me.firstName ?? ''} ${me.lastName ?? ''}`, api_id: CLIENTS[_hashCode].api_id, api_hash: CLIENTS[_hashCode].api_hash,
       session: CLIENTS[_hashCode].client.session.save(), posts:[] 
     };
+    console.log('END 1');
     await usersAppDB.insertOne(ACCOUNT);
+    console.log(ACCOUNT);
 
     //await serverBase.updateOne({ id_server: ID_SERVER }, { $push: { "auth_users": ACCOUNT } });
     res.json({ type: 'succes', msg:'Вы были авторизованы!' });
+    console.log('FINSH 1');
   } catch (err) {
     if (err.errorMessage === "SESSION_PASSWORD_NEEDED") {
       try{
+        console.log('BEGIN 2');
         const passwordInfo = await CLIENTS[_hashCode].client.invoke(new Api.account.GetPassword());
         const password = await CLIENTS[_hashCode].password;
         const passwordSrp = await passwordUtils.computeCheck(passwordInfo, password);
         await CLIENTS[_hashCode].client.invoke( new Api.auth.CheckPassword({ password: passwordSrp }) );
 
         const me = await CLIENTS[_hashCode].client.getMe();
-
+        console.log('MIDDLE 2');
 
         const ACCOUNT = {  
           id_server: SERVER.id_server,
           id, hash: _hashCode,  account_id: me.id.value, account_username: me.username, 
-          full_name: `${me.firstName ?? ''} ${me.lastName ?? ''}`, 
-          session: CLIENTS[id].client.session.save(), posts:[] 
+          full_name: `${me.firstName ?? ''} ${me.lastName ?? ''}`, api_id: CLIENTS[_hashCode].api_id, api_hash: CLIENTS[_hashCode].api_hash,
+          session: CLIENTS[_hashCode].client.session.save(), posts:[] 
         };
+        console.log('END 2');
         await usersAppDB.insertOne(ACCOUNT);
-        //console.log(ACCOUNT);
+       
+
+        console.log(ACCOUNT);
         res.json({ type: 'succes', msg:'Вы были авторизованы!' });
+
+        console.log('FISNISH 2');
 
       }
       catch(err2){
@@ -175,6 +199,14 @@ app.post('/api/add-post', async (req, res) => {
         USERS[hash][post_editor.id] = post_editor;  
         USERS[hash][post_editor.id].handler = createHandlerMessage(hash, post_editor.id, post_editor.channel, post_editor.chat);
         CLIENTS[hash].client.addEventHandler( USERS[hash][post_editor.id].handler, new NewMessage({ chats: [post_editor.chat] }) );
+
+        const CLIENT = CLIENTS[hash].client;
+        const channelEntity = await CLIENT.getEntity(post_editor.channel_name);
+        await CLIENT.invoke(new Api.channels.JoinChannel({ channel: channelEntity }));
+        const msgs = await CLIENT.getMessages(post_editor.channel_name, { limit: 1 });
+        const msg = msgs[0];
+        const discussionChat = await CLIENT.getEntity(msg.replies.channelId);
+        await CLIENT.invoke(new Api.channels.JoinChannel({ channel: discussionChat }));
       }
       else{
         const user = await usersAppDB.findOne({ hash });
@@ -216,6 +248,15 @@ app.post('/api/update-post', async (req, res) => {
       USERS[hash][post_editor.id] = await post_editor;  
       USERS[hash][post_editor.id].handler =  createHandlerMessage(hash, post_editor.id, post_editor.channel, post_editor.chat);
       await CLIENTS[hash].client.addEventHandler( USERS[hash][post_editor.id].handler, new NewMessage({ chats: [post_editor.chat] }));
+
+
+      const CLIENT = CLIENTS[hash].client;
+      const channelEntity = await CLIENT.getEntity(post_editor.channel_name);
+      await CLIENT.invoke(new Api.channels.JoinChannel({ channel: channelEntity }));
+      const msgs = await CLIENT.getMessages(post_editor.channel_name, { limit: 1 });
+      const msg = msgs[0];
+      const discussionChat = await CLIENT.getEntity(msg.replies.channelId);
+      await CLIENT.invoke(new Api.channels.JoinChannel({ channel: discussionChat }));
     }
     catch (e){
       console.log(e);
@@ -237,19 +278,6 @@ app.post('/api/delete-post', async (req, res) => {
 
 
 
-async function findChannel(name, type = 'chat') {
-  const dialogs = await client.getDialogs();
-  
-  const chat_slay = dialogs.find((chat) => chat.name === name);
-  if(type === 'chat'){
-    console.log(String(chat_slay?.id));
-  }
-  else{
-    console.log(String(chat_slay?.inputEntity?.channelId))
-  }
-  
-  //console.log(String(chat_slay?.id));
-}
 
 async function searchChannel(hash, post_editor) {
   try{
@@ -300,11 +328,21 @@ function createHandlerMessage(hash, id_post, channel, chat){
   }
 }
 
-async function loginAccount({ session, hash, posts  }) {
+async function loginAccount({ session, hash, posts, api_id, api_hash  }) {
   try {
     USERS[hash] = {};
     CLIENTS[hash] = {};
-    CLIENTS[hash].client = new TelegramClient(new StringSession(session), +SERVER.API_ID, SERVER.API_HASH, { connectionRetries: 5 });
+
+    if(api_id){
+      CLIENTS[hash].api_id = +api_id;
+      CLIENTS[hash].api_hash = api_hash;
+    }else{
+      CLIENTS[hash].api_id = +SERVER.API_ID;
+      CLIENTS[hash].api_hash = SERVER.API_HASH;
+    }
+    console.log( CLIENTS[hash].api_id, CLIENTS[hash].api_hash ); 
+
+    CLIENTS[hash].client = new TelegramClient(new StringSession(session), CLIENTS[hash].api_id, CLIENTS[hash].api_hash, { connectionRetries: 5 });
     await CLIENTS[hash].client.start();
     
     for(const post of posts){
