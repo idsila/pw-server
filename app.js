@@ -92,13 +92,12 @@ app.post('/auth/code-password', async (req, res) => {
 
   const _hashCode = HASH_TABLE[id];
 
-  console.log("ARGUMENTS:  ", id, username, code, password);
+
 
 
   CLIENTS[_hashCode].code = code.replaceAll(' ','');
   CLIENTS[_hashCode].password = password;
-  try { 
-    console.log('BEGIN 1');    
+  try {   
     CLIENTS[_hashCode].resultCodeTg = await CLIENTS[_hashCode].client.invoke(
       new Api.auth.SignIn({
         phoneNumber: CLIENTS[_hashCode].phone,
@@ -108,31 +107,27 @@ app.post('/auth/code-password', async (req, res) => {
     );
 
     const me = await CLIENTS[_hashCode].client.getMe();
-    console.log('MIDDLE 1');
     const ACCOUNT = {  
       id_server: SERVER.id_server,
       id, hash: _hashCode,  account_id: me.id.value, account_username: me.username, 
       full_name: `${me.firstName ?? ''} ${me.lastName ?? ''}`, api_id: CLIENTS[_hashCode].api_id, api_hash: CLIENTS[_hashCode].api_hash,
       session: CLIENTS[_hashCode].client.session.save(), posts:[] 
     };
-    console.log('END 1');
+
     await usersAppDB.insertOne(ACCOUNT);
     console.log(ACCOUNT);
 
     //await serverBase.updateOne({ id_server: ID_SERVER }, { $push: { "auth_users": ACCOUNT } });
     res.json({ type: 'succes', msg:'Вы были авторизованы!' });
-    console.log('FINSH 1');
   } catch (err) {
     if (err.errorMessage === "SESSION_PASSWORD_NEEDED") {
       try{
-        console.log('BEGIN 2');
         const passwordInfo = await CLIENTS[_hashCode].client.invoke(new Api.account.GetPassword());
         const password = await CLIENTS[_hashCode].password;
         const passwordSrp = await passwordUtils.computeCheck(passwordInfo, password);
         await CLIENTS[_hashCode].client.invoke( new Api.auth.CheckPassword({ password: passwordSrp }) );
 
         const me = await CLIENTS[_hashCode].client.getMe();
-        console.log('MIDDLE 2');
 
         const ACCOUNT = {  
           id_server: SERVER.id_server,
@@ -140,19 +135,18 @@ app.post('/auth/code-password', async (req, res) => {
           full_name: `${me.firstName ?? ''} ${me.lastName ?? ''}`, api_id: CLIENTS[_hashCode].api_id, api_hash: CLIENTS[_hashCode].api_hash,
           session: CLIENTS[_hashCode].client.session.save(), posts:[] 
         };
-        console.log('END 2');
+
         await usersAppDB.insertOne(ACCOUNT);
        
-
-        console.log(ACCOUNT);
         res.json({ type: 'succes', msg:'Вы были авторизованы!' });
-
-        console.log('FISNISH 2');
 
       }
       catch(err2){
         if (err2.errorMessage === "PASSWORD_HASH_INVALID") {
           res.json({ type: 'error', msg:'Облачный пароль не совпадает!'});
+          await CLIENTS[_hashCode].client.disconnect();
+          await CLIENTS[_hashCode].client.destroy();
+          delete CLIENTS[_hashCode];
         } 
       }
     } else {
@@ -160,11 +154,17 @@ app.post('/auth/code-password', async (req, res) => {
       console.error("❌ Ошибка входа:", err);
       if (err.errorMessage === "PHONE_CODE_INVALID") {    
          res.json({ type: 'error', msg:'Код введен не правильно!'});
+         await CLIENTS[_hashCode].client.disconnect();
+         await CLIENTS[_hashCode].client.destroy();
+         delete CLIENTS[_hashCode];
       }
     }
 
     if (err.errorMessage === "PHONE_CODE_EXPIRED") {
        res.json({ type: 'error', msg:'Время кода истекло!'});
+       await CLIENTS[_hashCode].client.disconnect();
+       await CLIENTS[_hashCode].client.destroy();
+       delete CLIENTS[_hashCode];
     } 
   }
 
@@ -340,7 +340,7 @@ async function loginAccount({ session, hash, posts, api_id, api_hash  }) {
       CLIENTS[hash].api_id = +SERVER.API_ID;
       CLIENTS[hash].api_hash = SERVER.API_HASH;
     }
-    console.log( CLIENTS[hash].api_id, CLIENTS[hash].api_hash ); 
+
 
     CLIENTS[hash].client = new TelegramClient(new StringSession(session), CLIENTS[hash].api_id, CLIENTS[hash].api_hash, { connectionRetries: 5 });
     await CLIENTS[hash].client.start();
