@@ -15,7 +15,9 @@ const delay = (s) => new Promise(r => setTimeout(r, 1000 * s));
 
 const ID_SERVER = process.env.ID_SERVER;
 const DB = require("./connectDB.js");
-const { users } = require("telegram/client/index.js");
+
+
+
 
 const usersAppDB = DB.connect("pw_app");
 const serversDB = DB.connect("pw_servers");
@@ -235,6 +237,8 @@ app.post('/api/update-post', async (req, res) => {
     const data = await searchChannel( hash, post_editor );
     post_editor.channel = data?.channel;
     post_editor.chat = data?.chat;
+    console.log("FINSIH 1");
+    return res.json({ type: 200 });
   } else{
     console.log('ALREDY FIND CHANNEL');
     post_editor.channel = channel.channel;
@@ -253,8 +257,13 @@ app.post('/api/update-post', async (req, res) => {
       const CLIENT = CLIENTS[hash].client;
       const channelEntity = await CLIENT.getEntity(post_editor.channel_name);
       await CLIENT.invoke(new Api.channels.JoinChannel({ channel: channelEntity }));
-      const msgs = await CLIENT.getMessages(post_editor.channel_name, { limit: 1 });
-      const msg = msgs[0];
+      const msgs = await CLIENT.getMessages(post_editor.channel_name, { limit: 42 });
+      const msg = msgs.find((item, id) => {
+        const it = +Number(item?.replies?.channelId?.value);
+        if(it > 777){
+          return item
+        }  
+      });
       const discussionChat = await CLIENT.getEntity(msg.replies.channelId);
       await CLIENT.invoke(new Api.channels.JoinChannel({ channel: discussionChat }));
     }
@@ -262,8 +271,8 @@ app.post('/api/update-post', async (req, res) => {
       console.log(e);
     }
 
-  console.log("FINSIH");
-  res.json({ type: 200 });
+  console.log("FINSIH 2");
+  return res.json({ type: 200 });
 });
 
 
@@ -285,8 +294,14 @@ async function searchChannel(hash, post_editor) {
 
     const channelEntity = await CLIENT.getEntity(post_editor.channel_name);
     await CLIENT.invoke(new Api.channels.JoinChannel({ channel: channelEntity }));
-    const msgs = await CLIENT.getMessages(post_editor.channel_name, { limit: 1 });
-    const msg = msgs[0];
+    const msgs = await CLIENT.getMessages(post_editor.channel_name, { limit: 42 });
+    const msg = msgs.find((item, id) => {
+      const it = +Number(item?.replies?.channelId?.value);
+      if(it > 777){
+        return item
+      }  
+    });
+
     const discussionChat = await CLIENT.getEntity(msg.replies.channelId);
     await CLIENT.invoke(new Api.channels.JoinChannel({ channel: discussionChat }));
   

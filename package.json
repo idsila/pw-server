@@ -1,5 +1,5 @@
 {
-  "name": "accounts-fugabots",
+  "name": "pw-server",
   "version": "1.0.0",
   "main": "app.js",
   "scripts": {
