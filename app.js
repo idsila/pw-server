@@ -16,9 +16,6 @@ const delay = (s) => new Promise(r => setTimeout(r, 1000 * s));
 const ID_SERVER = process.env.ID_SERVER;
 const DB = require("./connectDB.js");
 
-
-
-
 const usersAppDB = DB.connect("pw_app");
 const serversDB = DB.connect("pw_servers");
 const channelsDB = DB.connect("pw_channels");
@@ -181,15 +178,12 @@ app.post('/api/add-post', async (req, res) => {
   const { post_editor, hash } = req.body;
 
   const channel = await channelsDB.findOne({ channel_name: post_editor.channel_name });
-  console.log(post_editor.channel_name, channel);
 
   if(!channel){
-    console.log('FIND ADD CHANNEL');
     const data = await searchChannel( hash, post_editor );
     post_editor.channel = data?.channel;
     post_editor.chat = data?.chat;
   } else{
-    console.log('ALREDY FIND CHANNEL');
     post_editor.channel = channel.channel;
     post_editor.chat = channel.chat;
   }
@@ -199,14 +193,19 @@ app.post('/api/add-post', async (req, res) => {
     try{
       if(USERS[hash]){
         USERS[hash][post_editor.id] = post_editor;  
-        USERS[hash][post_editor.id].handler = createHandlerMessage(hash, post_editor.id, post_editor.channel, post_editor.chat);
+        USERS[hash][post_editor.id].handler = await createHandlerMessage(hash, post_editor.id, post_editor.channel, post_editor.chat);
         CLIENTS[hash].client.addEventHandler( USERS[hash][post_editor.id].handler, new NewMessage({ chats: [post_editor.chat] }) );
 
         const CLIENT = CLIENTS[hash].client;
         const channelEntity = await CLIENT.getEntity(post_editor.channel_name);
         await CLIENT.invoke(new Api.channels.JoinChannel({ channel: channelEntity }));
-        const msgs = await CLIENT.getMessages(post_editor.channel_name, { limit: 1 });
-        const msg = msgs[0];
+        const msgs = await CLIENT.getMessages(post_editor.channel_name, { limit: 42 });
+        const msg = msgs.find((item, id) => {
+          const it = +Number(item?.replies?.channelId?.value);
+          if(it > 777){
+            return item
+          }  
+        });
         const discussionChat = await CLIENT.getEntity(msg.replies.channelId);
         await CLIENT.invoke(new Api.channels.JoinChannel({ channel: discussionChat }));
       }
@@ -230,17 +229,12 @@ app.post('/api/update-post', async (req, res) => {
   const { post_editor, hash } = req.body;
 
   const channel = await channelsDB.findOne({ channel_name: post_editor.channel_name });
-  console.log(post_editor.channel_name, channel);
 
   if(!channel){
-    console.log('FIND ADD CHANNEL');
     const data = await searchChannel( hash, post_editor );
     post_editor.channel = data?.channel;
     post_editor.chat = data?.chat;
-    console.log("FINSIH 1");
-    return res.json({ type: 200 });
   } else{
-    console.log('ALREDY FIND CHANNEL');
     post_editor.channel = channel.channel;
     post_editor.chat = channel.chat;
   } 
@@ -250,7 +244,7 @@ app.post('/api/update-post', async (req, res) => {
         await CLIENTS[hash].client.removeEventHandler(USERS[hash][post_editor.id].handler, new NewMessage({ chats: [USERS[hash][post_editor.id].chat] }));
       }
       USERS[hash][post_editor.id] = await post_editor;  
-      USERS[hash][post_editor.id].handler =  createHandlerMessage(hash, post_editor.id, post_editor.channel, post_editor.chat);
+      USERS[hash][post_editor.id].handler = await createHandlerMessage(hash, post_editor.id, post_editor.channel, post_editor.chat);
       await CLIENTS[hash].client.addEventHandler( USERS[hash][post_editor.id].handler, new NewMessage({ chats: [post_editor.chat] }));
 
 
@@ -271,7 +265,6 @@ app.post('/api/update-post', async (req, res) => {
       console.log(e);
     }
 
-  console.log("FINSIH 2");
   return res.json({ type: 200 });
 });
 
@@ -313,8 +306,7 @@ async function searchChannel(hash, post_editor) {
   
     const data = { channel_name: post_editor.channel_name, channel: Number(String(CHANNEL_ID?.inputEntity?.channelId)), chat: Number(String(CHAT_ID?.id)) };
     await channelsDB.insertOne(data);
-    data.type = 'success';
-    console.log(data);  
+    data.type = 'success'; 
     return data;
     
   }
@@ -326,12 +318,16 @@ async function searchChannel(hash, post_editor) {
 }
 
 // Login Account Telegram
-function createHandlerMessage(hash, id_post, channel, chat){
+async function createHandlerMessage(hash, id_post, channel, chat){
+  console.log('CREATE HANDLER: ', hash, id_post, channel, chat);
   return async function(event){
     const message = event.message;
     if (Number(message.chatId.valueOf()) !== chat) return;
     if (message.fwdFrom && message.fwdFrom.channelPost && message.fwdFrom.fromId.className === "PeerChannel" && Number(message.fwdFrom.fromId.channelId) === channel) {
+      console.log('SEND MESSAGE TO CHAT: ', channel, chat);
+
       delay(USERS[hash][id_post].delay).then( async () => {
+        console.log('DATA MESSAGE :', USERS[hash][id_post].post_image, USERS[hash][id_post].post_text);
         await CLIENTS[hash].client.sendMessage(chat, {
           file: USERS[hash][id_post].post_image,
           message: USERS[hash][id_post].post_text,
@@ -367,7 +363,7 @@ async function loginAccount({ session, hash, posts, api_id, api_hash  }) {
 
     async function runNotifucation(post) {
       try{
-        USERS[hash][post.id].handler = createHandlerMessage(hash, post.id, post.channel, post.chat);
+        USERS[hash][post.id].handler = await createHandlerMessage(hash, post.id, post.channel, post.chat);
         CLIENTS[hash].client.addEventHandler( USERS[hash][post.id].handler, new NewMessage({ chats: [post.chat] }));
       }
       catch(e){
