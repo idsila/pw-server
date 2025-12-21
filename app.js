@@ -339,7 +339,7 @@ async function createHandlerMessage(hash, id_post, channel, chat){
               replyTo: message.id
             });
           } catch (err) {
-            axios.post(process.env.URL_BOT+'/telegram/send-text', { id: USERS[hash].id, text: `Ошибка при отправке сообщения: ${err.errorMessage}` })
+            axios.post(process.env.URL_BOT+'/telegram/send-text', { id: USERS[hash].id, text: `<b>❌ Ошибка при отправке сообщения в канал  @${USERS[hash][id_post].channel_name}:</b> \n <blockquote>${err.errorMessage}</blockquote>` })
             console.error("❌ Ошибка при отправке сообщения:", err);
 
          }
