@@ -3,6 +3,7 @@ require("dotenv").config();
 const fs = require("fs");
 
 const express = require("express");
+const axios = require("axios");
 const cors = require("cors");
 const app = express();
 
@@ -38,6 +39,8 @@ app.post('/auth/phone', async (req, res) => {
   HASH_TABLE[id] = hashCode();
   const _hashCode = HASH_TABLE[id];
   CLIENTS[_hashCode] = { phone };
+  USERS[_hashCode] = { id };
+
 
   if(api_id){
     CLIENTS[_hashCode].api_id = +api_id;
@@ -326,23 +329,29 @@ async function createHandlerMessage(hash, id_post, channel, chat){
     if (message.fwdFrom && message.fwdFrom.channelPost && message.fwdFrom.fromId.className === "PeerChannel" && Number(message.fwdFrom.fromId.channelId) === channel) {
       console.log('SEND MESSAGE TO CHAT: ', channel, chat);
 
-      delay(USERS[hash][id_post].delay).then( async () => {
-        console.log('DATA MESSAGE :', USERS[hash][id_post].post_image, USERS[hash][id_post].post_text);
-        await CLIENTS[hash].client.sendMessage(chat, {
+      try {
+        delay(USERS[hash][id_post].delay).then( async () => {
+          console.log('DATA MESSAGE :', USERS[hash][id_post].post_image, USERS[hash][id_post].post_text);
+          await CLIENTS[hash].client.sendMessage(chat, {
           file: USERS[hash][id_post].post_image,
           message: USERS[hash][id_post].post_text,
           parseMode: "html",
           replyTo: message.id
         });
-      })   
+       })  
+      } catch (err) {
+        axios.post(process.env.URL_BOT+'/telegram/send-text', { id: USERS[hash].id, text: `Ошибка при отправке сообщения: ${err.errorMessage}` })
+        console.error("❌ Ошибка при отправке сообщения:", err);
+
       }
-  }
+  } }
 }
 
-async function loginAccount({ session, hash, posts, api_id, api_hash  }) {
+async function loginAccount({ session, hash, posts, api_id, api_hash, id  }) {
   try {
     USERS[hash] = {};
     CLIENTS[hash] = {};
+    USERS[hash].id = id;
 
     if(api_id){
       CLIENTS[hash].api_id = +api_id;
@@ -400,6 +409,9 @@ function hashCode(n = 8) {
   }
   return user_hash;
 }
+
+
+
 
 
 app.listen(3057, (err) => {
