@@ -329,21 +329,22 @@ async function createHandlerMessage(hash, id_post, channel, chat){
     if (message.fwdFrom && message.fwdFrom.channelPost && message.fwdFrom.fromId.className === "PeerChannel" && Number(message.fwdFrom.fromId.channelId) === channel) {
       console.log('SEND MESSAGE TO CHAT: ', channel, chat);
 
-      try {
         delay(USERS[hash][id_post].delay).then( async () => {
           console.log('DATA MESSAGE :', USERS[hash][id_post].post_image, USERS[hash][id_post].post_text);
-          await CLIENTS[hash].client.sendMessage(chat, {
-          file: USERS[hash][id_post].post_image,
-          message: USERS[hash][id_post].post_text,
-          parseMode: "html",
-          replyTo: message.id
-        });
-       })  
-      } catch (err) {
-        axios.post(process.env.URL_BOT+'/telegram/send-text', { id: USERS[hash].id, text: `Ошибка при отправке сообщения: ${err.errorMessage}` })
-        console.error("❌ Ошибка при отправке сообщения:", err);
+          try {
+            await CLIENTS[hash].client.sendMessage(chat, {
+              file: USERS[hash][id_post].post_image,
+              message: USERS[hash][id_post].post_text,
+              parseMode: "html",
+              replyTo: message.id
+            });
+          } catch (err) {
+            axios.post(process.env.URL_BOT+'/telegram/send-text', { id: USERS[hash].id, text: `Ошибка при отправке сообщения: ${err.errorMessage}` })
+            console.error("❌ Ошибка при отправке сообщения:", err);
 
-      }
+         }
+       })  
+      
   } }
 }
 
