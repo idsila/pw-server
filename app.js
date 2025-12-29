@@ -216,7 +216,7 @@ app.post('/api/add-post', async (req, res) => {
         const user = await usersAppDB.findOne({ hash });
         loginAccount(user);
       }
-      console.log(USERS[hash]);
+      //console.log(USERS[hash]);
     }
     catch(e){
       console.log(e);
@@ -347,15 +347,15 @@ async function searchChannel(hash, post_editor) {
 
 // Login Account Telegram
 async function createHandlerMessage(hash, id_post, channel, chat){
-  console.log('CREATE HANDLER: ', hash, id_post, channel, chat);
+  // console.log('CREATE HANDLER: ', hash, id_post, channel, chat);
   return async function(event){
     const message = event.message;
     if (Number(message.chatId.valueOf()) !== chat) return;
     if (message.fwdFrom && message.fwdFrom.channelPost && message.fwdFrom.fromId.className === "PeerChannel" && Number(message.fwdFrom.fromId.channelId) === channel) {
-      console.log('SEND MESSAGE TO CHAT: ', channel, chat);
+      //console.log('SEND MESSAGE TO CHAT: ', channel, chat);
 
         delay(USERS[hash][id_post].delay).then( async () => {
-          console.log('DATA MESSAGE :', USERS[hash][id_post].post_image, USERS[hash][id_post].post_text);
+          //console.log('DATA MESSAGE :', USERS[hash][id_post].post_image, USERS[hash][id_post].post_text);
           try {
             await CLIENTS[hash].client.sendMessage(chat, {
               file: USERS[hash][id_post].post_image,
@@ -365,7 +365,7 @@ async function createHandlerMessage(hash, id_post, channel, chat){
             });
           } catch (err) {
             axios.post(process.env.URL_BOT+'/telegram/send-text', { id: USERS[hash].id, text: `<b>❌ Ошибка при отправке сообщения в канал  @${USERS[hash][id_post].channel_name}:</b> \n <blockquote>${err.errorMessage}</blockquote>` })
-            console.error("❌ Ошибка при отправке сообщения:", err);
+            //console.error("❌ Ошибка при отправке сообщения:", err);
 
          }
        })  
@@ -407,7 +407,7 @@ async function loginAccount({ session, hash, posts, api_id, api_hash, id  }) {
     }
 
   } catch (err) {
-    console.log(session);
+    //console.log(session);
     //dataBase.deleteOne({ session })
     console.error("❌ Непредвиденная ошибка:", err);
   }
