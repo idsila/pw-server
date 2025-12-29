@@ -111,7 +111,7 @@ app.post('/auth/code-password', async (req, res) => {
     const me = await CLIENTS[_hashCode].client.getMe();
     const ACCOUNT = {  
       id_server: SERVER.id_server,
-      id, hash: _hashCode,  account_id: me.id.value, account_username: me.username, 
+      id, hash: _hashCode,  account_id: me.id.value, account_username: me.username, isFrozen: false, isBanned: false,
       full_name: `${me.firstName ?? ''} ${me.lastName ?? ''}`, api_id: CLIENTS[_hashCode].api_id, api_hash: CLIENTS[_hashCode].api_hash,
       session: CLIENTS[_hashCode].client.session.save(), posts:[] 
     };
@@ -133,7 +133,7 @@ app.post('/auth/code-password', async (req, res) => {
 
         const ACCOUNT = {  
           id_server: SERVER.id_server,
-          id, hash: _hashCode,  account_id: me.id.value, account_username: me.username, 
+          id, hash: _hashCode,  account_id: me.id.value, account_username: me.username, isFrozen: false, isBanned: false,
           full_name: `${me.firstName ?? ''} ${me.lastName ?? ''}`, api_id: CLIENTS[_hashCode].api_id, api_hash: CLIENTS[_hashCode].api_hash,
           session: CLIENTS[_hashCode].client.session.save(), posts:[] 
         };
@@ -282,6 +282,17 @@ app.post('/api/delete-post', async (req, res) => {
 });
 
 
+app.post('/api/suspend-user', async (req, res) => {
+  const { hash } = req.body;
+  if (USERS[hash]?.client) {
+    console.log(`USER SUSPEND: ${hash}`);
+    await CLIENTS[hash].client.disconnect();
+    await CLIENTS[hash].client.destroy();
+    delete CLIENTS[hash];
+  }
+  res.json({ type: 200 });
+});
+
 
 
 async function searchChannel(hash, post_editor) {
@@ -397,7 +408,9 @@ async function startApp(){
   SERVER = await serversDB.findOne({ id_server: ID_SERVER });
   const AUTH_USERS = await usersAppDB.find({ id_server: ID_SERVER }).toArray();
   AUTH_USERS.forEach(user => {
-    loginAccount(user);
+    if(!user.isBanned && !user.isFrozen){
+      loginAccount(user);
+    }
   });
 }
 startApp();
