@@ -294,6 +294,20 @@ app.post('/api/suspend-user', async (req, res) => {
 });
 
 
+app.post('/api/restore-user', async (req, res) => {
+  const { hash } = req.body;
+
+  const AUTH_USERS = await usersAppDB.find({ id_server: ID_SERVER, hash }).toArray();
+  AUTH_USERS.forEach(user => {
+    if(!user.isBanned && !user.isFrozen){
+      loginAccount(user);
+    }
+  });
+
+  console.log(`USER RESTORE: ${hash}`);
+  res.json({ type: 200 });
+});
+
 
 async function searchChannel(hash, post_editor) {
   try{
