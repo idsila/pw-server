@@ -284,7 +284,7 @@ app.post('/api/delete-post', async (req, res) => {
 
 app.post('/api/suspend-user', async (req, res) => {
   const { hash } = req.body;
-  if (USERS[hash]?.client) {
+  if (CLIENTS[hash]?.client) {
     console.log(`USER SUSPEND: ${hash}`);
     await CLIENTS[hash].client.disconnect();
     await CLIENTS[hash].client.destroy();
