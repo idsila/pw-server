@@ -353,10 +353,9 @@ async function createHandlerMessage(hash, id_post, channel, chat){
     if (Number(message.chatId.valueOf()) !== chat) return;
     if (message.fwdFrom && message.fwdFrom.channelPost && message.fwdFrom.fromId.className === "PeerChannel" && Number(message.fwdFrom.fromId.channelId) === channel) {
 
-      console.log('MESSAGE: ',message.groupedId);
-      if(message.groupedId && !CLIENTS[hash].groupedId){
-        console.log('MESSAGE: ', Number(String(message.groupedId)));
-        CLIENTS[hash].groupedId = Number(String(message.groupedId));
+      if(message.groupedId && !CLIENTS[hash][String(message.groupedId)]){
+        console.log('MESSAGE:', String(message.groupedId));
+        CLIENTS[hash][String(message.groupedId)] = String(message.groupedId);
         delay(USERS[hash][id_post].delay).then( async () => {
           try {
             await CLIENTS[hash].client.sendMessage(chat, {
