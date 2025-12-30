@@ -352,7 +352,7 @@ async function createHandlerMessage(hash, id_post, channel, chat){
     const message = event.message;
     if (Number(message.chatId.valueOf()) !== chat) return;
     if (message.fwdFrom && message.fwdFrom.channelPost && message.fwdFrom.fromId.className === "PeerChannel" && Number(message.fwdFrom.fromId.channelId) === channel) {
-      //console.log('SEND MESSAGE TO CHAT: ', channel, chat);
+      console.log('MESSAGE: ', message);
 
         delay(USERS[hash][id_post].delay).then( async () => {
           //console.log('DATA MESSAGE :', USERS[hash][id_post].post_image, USERS[hash][id_post].post_text);
