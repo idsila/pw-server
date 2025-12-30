@@ -347,14 +347,12 @@ async function searchChannel(hash, post_editor) {
 
 // Login Account Telegram
 async function createHandlerMessage(hash, id_post, channel, chat){
-  // console.log('CREATE HANDLER: ', hash, id_post, channel, chat);
   return async function(event){
     const message = event.message;
     if (Number(message.chatId.valueOf()) !== chat) return;
     if (message.fwdFrom && message.fwdFrom.channelPost && message.fwdFrom.fromId.className === "PeerChannel" && Number(message.fwdFrom.fromId.channelId) === channel) {
 
       if(message.groupedId && !CLIENTS[hash][String(message.groupedId)]){
-        console.log('MESSAGE:', String(message.groupedId));
         CLIENTS[hash][String(message.groupedId)] = String(message.groupedId);
         delay(USERS[hash][id_post].delay).then( async () => {
           try {
@@ -371,9 +369,8 @@ async function createHandlerMessage(hash, id_post, channel, chat){
        })  
       }
       else if(!message.groupedId){
-        console.log('MESSAGE WITHOUT groupedId');
+
         delay(USERS[hash][id_post].delay).then( async () => {
-          //console.log('DATA MESSAGE :', USERS[hash][id_post].post_image, USERS[hash][id_post].post_text);
           try {
             await CLIENTS[hash].client.sendMessage(chat, {
               file: USERS[hash][id_post].post_image,
@@ -458,7 +455,6 @@ function hashCode(n = 8) {
 }
 
 
-// ids
 
 
 app.listen(3057, (err) => {
